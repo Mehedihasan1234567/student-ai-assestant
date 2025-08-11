@@ -40,11 +40,33 @@ export async function POST(req: Request) {
     }
 
     try {
-      // Use PDF.js for more reliable parsing
+      // Try pdf-parse first as it's more reliable for text-based PDFs
+      console.log("Trying pdf-parse method first...");
+      try {
+        const pdfParse = (await import("pdf-parse")).default;
+        const buffer = Buffer.from(fileBuffer);
+        const data = await pdfParse(buffer);
+        
+        if (data.text && data.text.trim().length > 0) {
+          console.log("pdf-parse successful, text length:", data.text.length);
+          return NextResponse.json({ 
+            text: data.text.trim(),
+            method: "pdf-parse",
+            pages: data.numpages 
+          });
+        }
+      } catch (pdfParseError) {
+        console.log("pdf-parse failed, trying PDF.js...", pdfParseError);
+      }
+
+      // Fallback to PDF.js
+      console.log("Using PDF.js as fallback...");
       const pdfjsLib = await import("pdfjs-dist");
 
       // Disable worker for serverless environment
-      pdfjsLib.GlobalWorkerOptions.workerSrc = null;
+      if (typeof pdfjsLib.GlobalWorkerOptions !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      }
 
       console.log("Loading PDF document...");
       const loadingTask = pdfjsLib.getDocument({
@@ -57,8 +79,9 @@ export async function POST(req: Request) {
 
       let fullText = "";
 
-      // Extract text from all pages
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      // Extract text from all pages (limit to first 10 for performance)
+      const maxPages = Math.min(pdf.numPages, 10);
+      for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
         console.log(`Processing page ${pageNum}...`);
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
@@ -70,31 +93,39 @@ export async function POST(req: Request) {
         fullText += pageText + "\n\n";
       }
 
-      console.log("PDF parsed successfully, text length:", fullText.length);
+      console.log("PDF.js completed, text length:", fullText.length);
 
       if (!fullText || fullText.trim().length === 0) {
         return NextResponse.json({
-          text: "This PDF appears to be image-based or contains no extractable text.",
           error: "No text found",
-        });
+          success: false,
+          message: "This PDF appears to be image-based or contains no extractable text. Try using a text-based PDF or OCR tools."
+        }, { status: 400 });
       }
 
-      return NextResponse.json({ text: fullText.trim() });
+      return NextResponse.json({ 
+        text: fullText.trim(),
+        success: true,
+        method: "PDF.js",
+        pages: maxPages 
+      });
     } catch (parseError) {
-      console.error("PDF.js parsing error:", parseError);
+      console.error("Both PDF parsing methods failed:", parseError);
 
       return NextResponse.json({
-        text: "Unable to extract text from this PDF using PDF.js. The file may be corrupted or in an unsupported format.",
-        error: "PDF.js parsing failed",
-      });
+        error: "PDF parsing failed",
+        success: false,
+        message: "Unable to extract text from this PDF. The file may be image-based, corrupted, or in an unsupported format. Please try: 1) Using a text-based PDF, 2) Converting with Google Drive OCR, 3) Using a different file."
+      }, { status: 400 });
     }
   } catch (err) {
     console.error("Error in PDF.js extract-text API:", err);
     return NextResponse.json(
       {
         error: "Failed to extract text",
-        details: err instanceof Error ? err.message : "Unknown error",
-        text: "An error occurred while processing your PDF with PDF.js. Please try again.",
+        success: false,
+        message: "An error occurred while processing your PDF with PDF.js. Please try again.",
+        details: err instanceof Error ? err.message : "Unknown error"
       },
       { status: 500 }
     );

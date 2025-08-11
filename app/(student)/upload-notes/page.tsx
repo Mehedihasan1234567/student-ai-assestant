@@ -24,6 +24,11 @@ export default function UploadNotesPage() {
   const [uploadResult, setUploadResult] = React.useState<any>(null)
   const [recent, setRecent] = React.useState<UploadRecord[]>([])
   const [isUploading, setIsUploading] = React.useState(false)
+  const [isGenerating, setIsGenerating] = React.useState(false)
+  const [generatingType, setGeneratingType] = React.useState<'summary' | 'quiz' | null>(null)
+  const [currentNoteId, setCurrentNoteId] = React.useState<number | null>(null)
+  const [generatedSummary, setGeneratedSummary] = React.useState<any>(null)
+  const [generatedQuiz, setGeneratedQuiz] = React.useState<any>(null)
 
   React.useEffect(() => {
     const raw = localStorage.getItem("recentUploads") || "[]"
@@ -93,6 +98,142 @@ export default function UploadNotesPage() {
     setExtractedText("")
     setUploadResult(null)
     setIsUploading(false)
+    setGeneratedSummary(null)
+    setGeneratedQuiz(null)
+    setCurrentNoteId(null)
+  }
+
+  const handleGenerateSummary = async () => {
+    if (!extractedText || !uploadResult) return
+
+    setIsGenerating(true)
+    setGeneratingType('summary')
+
+    try {
+      // First save the note if not already saved
+      let noteId = currentNoteId
+      if (!noteId) {
+        const noteResponse = await fetch("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: uploadResult.fileName || "Uploaded Note",
+            content: extractedText,
+            fileUrl: uploadResult.fileUrl
+          }),
+        })
+
+        const noteData = await noteResponse.json()
+        if (noteData.success) {
+          noteId = noteData.note.id
+          setCurrentNoteId(noteId)
+        }
+      }
+
+      // Generate summary
+      const response = await fetch("/api/generate-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          noteId: noteId.toString(),
+          content: extractedText,
+          title: uploadResult.fileName || "Summary"
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setGeneratedSummary(data.summary)
+        toast({
+          title: "সফল!",
+          description: "সারসংক্ষেপ তৈরি করা হয়েছে",
+        })
+      } else {
+        toast({
+          title: "ব্যর্থ",
+          description: data.error || "সারসংক্ষেপ তৈরি করতে সমস্যা হয়েছে",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error("Summary generation error:", error)
+      toast({
+        title: "এরর",
+        description: "সারসংক্ষেপ তৈরি করতে সমস্যা হয়েছে",
+        variant: "destructive"
+      })
+    } finally {
+      setIsGenerating(false)
+      setGeneratingType(null)
+    }
+  }
+
+  const handleGenerateQuiz = async () => {
+    if (!extractedText || !uploadResult) return
+
+    setIsGenerating(true)
+    setGeneratingType('quiz')
+
+    try {
+      // First save the note if not already saved
+      let noteId = currentNoteId
+      if (!noteId) {
+        const noteResponse = await fetch("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: uploadResult.fileName || "Uploaded Note",
+            content: extractedText,
+            fileUrl: uploadResult.fileUrl
+          }),
+        })
+
+        const noteData = await noteResponse.json()
+        if (noteData.success) {
+          noteId = noteData.note.id
+          setCurrentNoteId(noteId)
+        }
+      }
+
+      // Generate quiz
+      const response = await fetch("/api/generate-quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          noteId: noteId.toString(),
+          content: extractedText,
+          title: uploadResult.fileName || "Quiz",
+          difficulty: "medium"
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setGeneratedQuiz(data.quiz)
+        toast({
+          title: "সফল!",
+          description: "কুইজ তৈরি করা হয়েছে",
+        })
+      } else {
+        toast({
+          title: "ব্যর্থ",
+          description: data.error || "কুইজ তৈরি করতে সমস্যা হয়েছে",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error("Quiz generation error:", error)
+      toast({
+        title: "এরর",
+        description: "কুইজ তৈরি করতে সমস্যা হয়েছে",
+        variant: "destructive"
+      })
+    } finally {
+      setIsGenerating(false)
+      setGeneratingType(null)
+    }
   }
 
   const formatBytes = (bytes: number) => {
@@ -164,13 +305,135 @@ export default function UploadNotesPage() {
                   নতুন ফাইল
                 </Button>
               </div>
-              <p className="text-sm text-green-700 dark:text-green-300">
+              <p className="text-sm text-green-700 dark:text-green-300 mb-3">
                 টেক্সট লেংথ: {uploadResult.textLength} অক্ষর
               </p>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  onClick={() => handleGenerateSummary()}
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
+                  size="sm"
+                  disabled={isGenerating}
+                >
+                  {isGenerating && generatingType === 'summary' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      তৈরি হচ্ছে...
+                    </>
+                  ) : (
+                    <>
+                      📝 সারসংক্ষেপ তৈরি করুন
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => handleGenerateQuiz()}
+                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                  size="sm"
+                  disabled={isGenerating}
+                >
+                  {isGenerating && generatingType === 'quiz' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      তৈরি হচ্ছে...
+                    </>
+                  ) : (
+                    <>
+                      ❓ কুইজ তৈরি করুন
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Generated Summary */}
+      {generatedSummary && (
+        <Card className="rounded-xl shadow-lg border-blue-200 dark:border-blue-800">
+          <CardHeader>
+            <CardTitle className="text-blue-800 dark:text-blue-200 flex items-center gap-2">
+              📝 AI সারসংক্ষেপ
+            </CardTitle>
+            <CardDescription>AI দ্বারা তৈরি করা সারসংক্ষেপ</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="prose dark:prose-invert max-w-none">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">সারসংক্ষেপ:</h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  {typeof generatedSummary.summary === 'string'
+                    ? generatedSummary.summary.replace(/```json|```/g, '').trim()
+                    : generatedSummary.summary}
+                </p>
+              </div>
+
+              {generatedSummary.keyPoints && (
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                  <h4 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">মূল বিষয়সমূহ:</h4>
+                  <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
+                    {generatedSummary.keyPoints.map((point: string, index: number) => (
+                      <li key={index}>• {point}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Generated Quiz */}
+      {generatedQuiz && (
+        <Card className="rounded-xl shadow-lg border-orange-200 dark:border-orange-800">
+          <CardHeader>
+            <CardTitle className="text-orange-800 dark:text-orange-200 flex items-center gap-2">
+              ❓ AI কুইজ
+            </CardTitle>
+            <CardDescription>AI দ্বারা তৈরি করা কুইজ প্রশ্ন</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {generatedQuiz.questions && generatedQuiz.questions.map((question: any, index: number) => (
+                <div key={index} className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <h4 className="font-semibold text-orange-800 dark:text-orange-200 mb-3">
+                    প্রশ্ন {index + 1}: {question.question}
+                  </h4>
+                  <div className="space-y-2">
+                    {question.options && question.options.map((option: string, optIndex: number) => (
+                      <div
+                        key={optIndex}
+                        className={cn(
+                          "p-2 rounded border text-sm",
+                          optIndex === question.correctAnswer
+                            ? "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
+                            : "bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700"
+                        )}
+                      >
+                        <span className="font-medium">{String.fromCharCode(65 + optIndex)})</span> {option}
+                        {optIndex === question.correctAnswer && (
+                          <span className="ml-2 text-green-600 dark:text-green-400">✓ সঠিক উত্তর</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {question.explanation && (
+                    <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        <strong>ব্যাখ্যা:</strong> {question.explanation}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Extracted Text Display */}
       {extractedText && (

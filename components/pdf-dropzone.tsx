@@ -161,11 +161,11 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
               let extractionMethod = "";
 
               try {
-                // First try: PDF.js method (more reliable)
-                console.log("Trying PDF.js method...");
-                setUploadProgress("PDF.js method দিয়ে চেষ্টা করা হচ্ছে...")
+                // Primary: Google Docs optimized extraction
+                console.log("Trying Google Docs PDF extraction...");
+                setUploadProgress("Google Docs PDF টেক্সট এক্সট্রাকশন চলছে...")
 
-                const response1 = await fetch("/api/extract-text-pdfjs", {
+                const response1 = await fetch("/api/extract-text-google-docs", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ fileUrl }),
@@ -173,21 +173,21 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
 
                 const data1 = await response1.json();
 
-                if (data1.text && data1.text.trim().length > 10 && !data1.error) {
+                if (data1.success && data1.text && data1.text.trim().length > 10) {
                   extractedText = data1.text;
-                  extractionMethod = "PDF.js";
-                  console.log("Successfully extracted with PDF.js");
+                  extractionMethod = data1.method || "Google-Docs";
+                  console.log("Successfully extracted with Google Docs method:", data1.method);
                 } else {
-                  throw new Error("PDF.js failed or returned insufficient text");
+                  throw new Error(data1.message || "Google Docs extraction failed");
                 }
 
               } catch (error1) {
-                console.log("PDF.js failed, trying pdf-parse method...");
-                setUploadProgress("pdf-parse method দিয়ে চেষ্টা করা হচ্ছে...")
+                console.log("Google Docs method failed, trying raw extraction...");
+                setUploadProgress("Raw PDF extraction method দিয়ে চেষ্টা করা হচ্ছে...")
 
                 try {
-                  // Second try: pdf-parse method
-                  const response2 = await fetch("/api/extract-text", {
+                  // Fallback: Raw PDF extraction
+                  const response2 = await fetch("/api/extract-text-node", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ fileUrl }),
@@ -195,29 +195,51 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
 
                   const data2 = await response2.json();
 
-                  if (data2.text && data2.text.trim().length > 10) {
+                  if (data2.success && data2.text && data2.text.trim().length > 10) {
                     extractedText = data2.text;
-                    extractionMethod = "pdf-parse";
-                    console.log("Successfully extracted with pdf-parse");
+                    extractionMethod = data2.method || "Raw-Extraction";
+                    console.log("Successfully extracted with raw extraction");
                   } else {
-                    throw new Error("pdf-parse also failed");
+                    throw new Error(data2.message || "Raw extraction also failed");
                   }
 
                 } catch (error2) {
-                  console.error("Both extraction methods failed:", error1, error2);
+                  console.log("Raw extraction also failed, trying comprehensive method...");
+                  setUploadProgress("Comprehensive PDF extraction method দিয়ে চেষ্টা করা হচ্ছে...")
 
-                  // Try to debug the PDF to give better error message
                   try {
-                    setUploadProgress("PDF বিশ্লেষণ করা হচ্ছে...")
-                    const debugResponse = await fetch("/api/debug-pdf", {
+                    // Third try: Comprehensive method
+                    const response3 = await fetch("/api/extract-text-comprehensive", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ fileUrl }),
                     });
 
-                    const debugData = await debugResponse.json();
+                    const data3 = await response3.json();
 
-                    if (debugData.success && debugData.recommendations.length > 0) {
+                    if (data3.success && data3.text && data3.text.trim().length > 10) {
+                      extractedText = data3.text;
+                      extractionMethod = data3.method || "Comprehensive";
+                      console.log("Successfully extracted with comprehensive method");
+                    } else {
+                      throw new Error(data3.message || "Comprehensive method also failed");
+                    }
+
+                  } catch (error3) {
+                    console.error("All extraction methods failed:", error1, error2, error3);
+
+                    // Try to debug the PDF to give better error message
+                    try {
+                      setUploadProgress("PDF বিশ্লেষণ করা হচ্ছে...")
+                      const debugResponse = await fetch("/api/debug-pdf", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ fileUrl }),
+                      });
+
+                      const debugData = await debugResponse.json();
+
+                    if (debugData.success && debugData.recommendations && debugData.recommendations.length > 0) {
                       setUploadState("error")
                       setUploadProgress(debugData.recommendations[0])
                       if (onUploadError) {
@@ -225,19 +247,20 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
                       }
                     } else {
                       setUploadState("error")
-                      setUploadProgress("টেক্সট এক্সট্রাক্ট করতে ব্যর্থ - ফাইলটি image-based হতে পারে")
+                      setUploadProgress("টেক্সট এক্সট্রাক্ট করতে ব্যর্থ - ফাইলটি image-based বা corrupted হতে পারে")
                       if (onUploadError) {
-                        onUploadError("Unable to extract text from this PDF. The file may be image-based or corrupted.");
+                        onUploadError("Unable to extract text from this PDF. The file may be image-based or corrupted. Please try using a text-based PDF or convert it using Google Drive OCR.");
                       }
                     }
                   } catch (debugError) {
                     setUploadState("error")
-                    setUploadProgress("টেক্সট এক্সট্রাক্ট করতে ব্যর্থ - ফাইলটি image-based হতে পারে")
+                    setUploadProgress("টেক্সট এক্সট্রাক্ট করতে ব্যর্থ - ফাইলটি image-based বা corrupted হতে পারে")
                     if (onUploadError) {
-                      onUploadError("Unable to extract text from this PDF. The file may be image-based or corrupted.");
+                      onUploadError("Unable to extract text from this PDF. The file may be image-based or corrupted. Please try using a text-based PDF or convert it using Google Drive OCR.");
                     }
                   }
-                  return;
+                    return;
+                  }
                 }
               }
 

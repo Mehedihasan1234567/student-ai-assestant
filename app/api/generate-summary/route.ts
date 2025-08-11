@@ -86,8 +86,8 @@ ${content.substring(0, 3000)}...
     const [savedSummary] = await db.insert(summaries).values({
       noteId: parseInt(noteId),
       title: title || "AI Generated Summary",
-      summary: summaryData.summary,
-      keyPoints: summaryData.keyPoints,
+      summary: typeof summaryData.summary === 'string' ? summaryData.summary : JSON.stringify(summaryData.summary),
+      keyPoints: Array.isArray(summaryData.keyPoints) ? summaryData.keyPoints : [],
     }).returning();
 
     // Track in study history

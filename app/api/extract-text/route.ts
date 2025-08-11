@@ -31,49 +31,50 @@ export async function POST(req: Request) {
     }
 
     try {
-      // Try to use pdf-parse with proper error handling
-      console.log("Attempting to parse PDF...");
+      // Skip pdf-parse due to serverless compatibility issues
+      // Redirect to PDF.js method which is more reliable
+      console.log("Redirecting to PDF.js method for better serverless compatibility...");
       
-      // Create a clean buffer
-      const buffer = Buffer.from(fileBuffer);
-      
-      // Dynamic import with better error handling
-      const pdfParse = await import("pdf-parse").then(module => module.default);
-      
-      // Parse with options to avoid file system issues
-      const data = await pdfParse(buffer, {
-        // Disable external file dependencies
-        max: 0, // Parse all pages
-        version: 'v1.10.100' // Specify version to avoid compatibility issues
+      const pdfJsResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/extract-text-pdfjs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl }),
       });
+
+      const pdfJsData = await pdfJsResponse.json();
       
-      console.log("PDF parsed successfully, text length:", data.text.length);
-
-      if (!data.text || data.text.trim().length === 0) {
-        return NextResponse.json({ 
-          error: "No text found in PDF", 
-          text: "This PDF appears to be image-based or contains no extractable text." 
+      if (pdfJsData.success) {
+        return NextResponse.json({
+          text: pdfJsData.text,
+          success: true,
+          method: "PDF.js (via redirect)"
         });
+      } else {
+        return NextResponse.json({
+          error: "PDF parsing failed",
+          success: false,
+          message: pdfJsData.message || "Unable to extract text from this PDF."
+        }, { status: 400 });
       }
-
-      return NextResponse.json({ text: data.text });
       
     } catch (parseError) {
       console.error("PDF parsing error:", parseError);
       
-      // Fallback: Return a message indicating the PDF couldn't be parsed
+      // Fallback: Return proper error response
       return NextResponse.json({ 
-        text: "Unable to extract text from this PDF. The file may be image-based, corrupted, or in an unsupported format. Please try converting it to a text-based PDF first.",
-        error: "PDF parsing failed"
-      });
+        error: "PDF parsing failed",
+        success: false,
+        message: "Unable to extract text from this PDF. The file may be image-based, corrupted, or in an unsupported format. Please try converting it to a text-based PDF first."
+      }, { status: 400 });
     }
 
   } catch (err) {
     console.error("Error in extract-text API:", err);
     return NextResponse.json({ 
       error: "Failed to extract text", 
-      details: err instanceof Error ? err.message : "Unknown error",
-      text: "An error occurred while processing your PDF. Please try again with a different file."
+      success: false,
+      message: "An error occurred while processing your PDF. Please try again with a different file.",
+      details: err instanceof Error ? err.message : "Unknown error"
     }, { status: 500 });
   }
 }

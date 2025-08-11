@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
     console.log("Making request to Hugging Face API...");
     const response = await fetch(
-      "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium",
+      "https://api-inference.huggingface.co/models/openai/gpt-oss-120b",
       {
         method: "POST",
         headers: {
