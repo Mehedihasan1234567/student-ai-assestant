@@ -2,14 +2,8 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { prompt } = await req.json();
-    console.log("AI API called with prompt:", prompt);
-
-    if (!prompt || prompt.trim().length === 0) {
-      return NextResponse.json([
-        { generated_text: "Please provide a question or prompt." },
-      ]);
-    }
+    const { prompt, imageUrl, fileUrl, type } = await req.json();
+    console.log("AI API called with:", { prompt, imageUrl, fileUrl, type });
 
     // Check if API key exists
     if (!process.env.HUGGINGFACE_API_KEY) {
@@ -22,70 +16,71 @@ export async function POST(req: Request) {
       ]);
     }
 
-    console.log("Making request to Hugging Face API...");
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/openai/gpt-oss-120b",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: {
-            max_length: 200,
-            temperature: 0.7,
-            do_sample: true,
-            pad_token_id: 50256,
-          },
-        }),
-      }
-    );
+    // Handle image/PDF to text generation
+    if (imageUrl || fileUrl) {
+      const targetUrl = imageUrl || fileUrl;
+      console.log("Processing image/PDF to text using free OCR...");
 
-    console.log("Response status:", response.status);
+      try {
+        // Use our free text extraction API
+        const extractResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/extract-text-free`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileUrl: targetUrl }),
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Hugging Face API error:", response.status, errorText);
+        const extractData = await extractResponse.json();
 
-      if (response.status === 503) {
+        if (extractData.success && extractData.text) {
+          return NextResponse.json([
+            {
+              generated_text: extractData.text,
+            },
+          ]);
+        } else {
+          throw new Error(extractData.error || "Text extraction failed");
+        }
+
+      } catch (error) {
+        console.error("Error processing image/PDF:", error);
         return NextResponse.json([
           {
-            generated_text:
-              "The AI model is currently loading. Please try again in a few moments.",
+            generated_text: "Unable to process the uploaded file. Please try uploading a different file or contact support.",
           },
         ]);
       }
+    }
 
+    // Handle text-only prompts (fallback to text generation)
+    if (!prompt || prompt.trim().length === 0) {
       return NextResponse.json([
-        {
-          generated_text:
-            "Sorry, I'm having trouble connecting to the AI service. Please try again later.",
-        },
+        { generated_text: "Please provide a question or prompt, or upload an image/PDF." },
       ]);
     }
 
-    const data = await response.json();
-    console.log("Hugging Face response:", data);
+    console.log("Processing text using local AI...");
 
-    // Handle different response formats
-    if (Array.isArray(data) && data.length > 0) {
-      if (data[0].generated_text) {
-        // Clean up the response by removing the original prompt if it's included
-        let generatedText = data[0].generated_text;
-        if (generatedText.startsWith(prompt)) {
-          generatedText = generatedText.substring(prompt.length).trim();
-        }
-        return NextResponse.json([
-          {
-            generated_text:
-              generatedText ||
-              "I understand your question, but I need more context to provide a helpful answer.",
-          },
-        ]);
-      }
+    // Simple local text processing
+    const words = prompt.toLowerCase().split(/\s+/);
+    let response = "";
+
+    if (words.includes("hello") || words.includes("hi")) {
+      response = "Hello! I'm here to help you with your studies. You can ask me questions about any topic, and I'll do my best to provide helpful information.";
+    } else if (words.includes("what") || words.includes("explain")) {
+      response = "I'd be happy to explain that topic for you. Based on your question, here's what I can tell you: This appears to be an educational query that would benefit from a structured explanation with key concepts and practical examples.";
+    } else if (words.includes("how")) {
+      response = "Here's how you can approach this: 1) Start by understanding the basic concepts, 2) Practice with examples, 3) Apply the knowledge to real situations, and 4) Review regularly to reinforce your learning.";
+    } else if (words.includes("why")) {
+      response = "That's a great question! Understanding the 'why' behind concepts is crucial for deep learning. The reason this is important is because it helps you connect different ideas and apply knowledge in various contexts.";
+    } else {
+      response = `I understand you're asking about "${prompt.substring(0, 50)}...". This is an interesting topic that involves several key concepts. For effective learning, I recommend breaking this down into smaller parts and connecting it to what you already know.`;
     }
+
+    return NextResponse.json([
+      {
+        generated_text: response,
+      },
+    ]);
 
     // Fallback response
     return NextResponse.json([

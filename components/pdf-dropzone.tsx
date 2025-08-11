@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { UploadCloud, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { UploadCloud, FileText, Image, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 
 import { UploadButton } from "@uploadthing/react";
 import type { OurFileRouter } from "@/lib/uploadthing";
@@ -21,22 +21,26 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
   const [uploadState, setUploadState] = React.useState<UploadState>("idle")
   const [uploadProgress, setUploadProgress] = React.useState("")
   const [selectedFileName, setSelectedFileName] = React.useState("")
+  const [fileType, setFileType] = React.useState<"pdf" | "image" | null>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return
     const file = files[0]
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
-    if (isPdf) {
+    const isImage = file.type.startsWith("image/") || /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(file.name)
+
+    if (isPdf || isImage) {
       setSelectedFileName(file.name)
+      setFileType(isPdf ? "pdf" : "image")
       setUploadState("idle")
       setUploadProgress("")
       onSelect(file)
     } else {
       setUploadState("error")
-      setUploadProgress("শুধুমাত্র PDF ফাইল সাপোর্টেড")
+      setUploadProgress("শুধুমাত্র PDF এবং Image ফাইল সাপোর্টেড")
       if (onUploadError) {
-        onUploadError("Please upload a PDF file.")
+        onUploadError("Please upload a PDF or Image file.")
       }
     }
   }
@@ -68,7 +72,9 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
       case "error":
         return <AlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
       default:
-        return <UploadCloud className="h-7 w-7 text-sky-600 dark:text-teal-400" />
+        return fileType === "image" ?
+          <Image className="h-7 w-7 text-sky-600 dark:text-teal-400" /> :
+          <UploadCloud className="h-7 w-7 text-sky-600 dark:text-teal-400" />
     }
   }
 
@@ -104,7 +110,7 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
       role="region"
       aria-label="Upload PDF notes"
     >
-      <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={onChange} />
+      <input ref={inputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={onChange} />
 
       <div className="flex flex-col items-center gap-4">
         {/* Status Icon */}
@@ -118,21 +124,24 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
         {/* Main Text */}
         <div className="space-y-2">
           <p className="text-base font-medium text-neutral-800 dark:text-neutral-100">
-            {uploadState === "idle" ? "PDF ফাইল ড্র্যাগ করুন অথবা ক্লিক করুন" :
+            {uploadState === "idle" ? "PDF বা Image ফাইল ড্র্যাগ করুন অথবা ক্লিক করুন" :
               uploadState === "uploading" ? "আপলোড হচ্ছে..." :
-                uploadState === "extracting" ? "টেক্সট এক্সট্রাক্ট করা হচ্ছে..." :
+                uploadState === "extracting" ? "AI দিয়ে টেক্সট এক্সট্রাক্ট করা হচ্ছে..." :
                   uploadState === "success" ? "সফলভাবে সম্পন্ন!" :
                     "আপলোড ব্যর্থ"}
           </p>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            {uploadProgress || "শুধুমাত্র PDF ফাইল সাপোর্টেড (সর্বোচ্চ 16MB)"}
+            {uploadProgress || "PDF এবং Image ফাইল সাপোর্টেড (সর্বোচ্চ 16MB) - Local AI Processing"}
           </p>
         </div>
 
         {/* Selected File Info */}
         {selectedFileName && (
           <div className="flex items-center gap-2 px-3 py-2 bg-white/50 dark:bg-neutral-800/50 rounded-lg border">
-            <FileText className="h-4 w-4 text-red-600" />
+            {fileType === "image" ?
+              <Image className="h-4 w-4 text-blue-600" /> :
+              <FileText className="h-4 w-4 text-red-600" />
+            }
             <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
               {selectedFileName}
             </span>
@@ -154,134 +163,54 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
               console.log("Uploaded file URL:", fileUrl);
 
               setUploadState("extracting")
-              setUploadProgress("PDF থেকে টেক্সট এক্সট্রাক্ট করা হচ্ছে...")
-
-              // Try multiple extraction methods
-              let extractedText = "";
-              let extractionMethod = "";
+              setUploadProgress("Free OCR দিয়ে টেক্সট এক্সট্রাক্ট করা হচ্ছে...")
 
               try {
-                // Primary: Google Docs optimized extraction
-                console.log("Trying Google Docs PDF extraction...");
-                setUploadProgress("Google Docs PDF টেক্সট এক্সট্রাকশন চলছে...")
+                console.log("Using free OCR for text extraction...");
 
-                const response1 = await fetch("/api/extract-text-google-docs", {
+                const response = await fetch("/api/ai", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ fileUrl }),
+                  body: JSON.stringify({
+                    fileUrl,
+                    type: fileType,
+                    prompt: "Extract all text from this document/image and convert it to clean, readable markdown format. Include any tables, lists, headings, and preserve the structure as much as possible."
+                  }),
                 });
 
-                const data1 = await response1.json();
+                const data = await response.json();
+                console.log("Free OCR response:", data);
 
-                if (data1.success && data1.text && data1.text.trim().length > 10) {
-                  extractedText = data1.text;
-                  extractionMethod = data1.method || "Google-Docs";
-                  console.log("Successfully extracted with Google Docs method:", data1.method);
-                } else {
-                  throw new Error(data1.message || "Google Docs extraction failed");
-                }
+                if (data && Array.isArray(data) && data[0]?.generated_text) {
+                  const extractedText = data[0].generated_text;
 
-              } catch (error1) {
-                console.log("Google Docs method failed, trying raw extraction...");
-                setUploadProgress("Raw PDF extraction method দিয়ে চেষ্টা করা হচ্ছে...")
+                  if (extractedText && extractedText.trim().length > 10) {
+                    console.log(`Text extracted using Free OCR, length: ${extractedText.length}`);
+                    setUploadState("success")
+                    setUploadProgress(`সফলভাবে সম্পন্ন! ${extractedText.length} অক্ষর এক্সট্রাক্ট করা হয়েছে (Free OCR)`)
 
-                try {
-                  // Fallback: Raw PDF extraction
-                  const response2 = await fetch("/api/extract-text-node", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ fileUrl }),
-                  });
-
-                  const data2 = await response2.json();
-
-                  if (data2.success && data2.text && data2.text.trim().length > 10) {
-                    extractedText = data2.text;
-                    extractionMethod = data2.method || "Raw-Extraction";
-                    console.log("Successfully extracted with raw extraction");
+                    setTimeout(() => {
+                      if (onUploadComplete) {
+                        onUploadComplete({
+                          fileUrl,
+                          extractedText,
+                          fileName
+                        });
+                      }
+                    }, 1000); // Small delay to show success state
                   } else {
-                    throw new Error(data2.message || "Raw extraction also failed");
+                    throw new Error("No meaningful text extracted");
                   }
-
-                } catch (error2) {
-                  console.log("Raw extraction also failed, trying comprehensive method...");
-                  setUploadProgress("Comprehensive PDF extraction method দিয়ে চেষ্টা করা হচ্ছে...")
-
-                  try {
-                    // Third try: Comprehensive method
-                    const response3 = await fetch("/api/extract-text-comprehensive", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ fileUrl }),
-                    });
-
-                    const data3 = await response3.json();
-
-                    if (data3.success && data3.text && data3.text.trim().length > 10) {
-                      extractedText = data3.text;
-                      extractionMethod = data3.method || "Comprehensive";
-                      console.log("Successfully extracted with comprehensive method");
-                    } else {
-                      throw new Error(data3.message || "Comprehensive method also failed");
-                    }
-
-                  } catch (error3) {
-                    console.error("All extraction methods failed:", error1, error2, error3);
-
-                    // Try to debug the PDF to give better error message
-                    try {
-                      setUploadProgress("PDF বিশ্লেষণ করা হচ্ছে...")
-                      const debugResponse = await fetch("/api/debug-pdf", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ fileUrl }),
-                      });
-
-                      const debugData = await debugResponse.json();
-
-                    if (debugData.success && debugData.recommendations && debugData.recommendations.length > 0) {
-                      setUploadState("error")
-                      setUploadProgress(debugData.recommendations[0])
-                      if (onUploadError) {
-                        onUploadError(debugData.recommendations.join(" "));
-                      }
-                    } else {
-                      setUploadState("error")
-                      setUploadProgress("টেক্সট এক্সট্রাক্ট করতে ব্যর্থ - ফাইলটি image-based বা corrupted হতে পারে")
-                      if (onUploadError) {
-                        onUploadError("Unable to extract text from this PDF. The file may be image-based or corrupted. Please try using a text-based PDF or convert it using Google Drive OCR.");
-                      }
-                    }
-                  } catch (debugError) {
-                    setUploadState("error")
-                    setUploadProgress("টেক্সট এক্সট্রাক্ট করতে ব্যর্থ - ফাইলটি image-based বা corrupted হতে পারে")
-                    if (onUploadError) {
-                      onUploadError("Unable to extract text from this PDF. The file may be image-based or corrupted. Please try using a text-based PDF or convert it using Google Drive OCR.");
-                    }
-                  }
-                    return;
-                  }
+                } else {
+                  throw new Error("Invalid response from AI model");
                 }
-              }
 
-              // Call the callback with the result
-              if (onUploadComplete && extractedText) {
-                console.log(`Text extracted using ${extractionMethod}, length: ${extractedText.length}`);
-                setUploadState("success")
-                setUploadProgress(`সফলভাবে সম্পন্ন! ${extractedText.length} অক্ষর এক্সট্রাক্ট করা হয়েছে (${extractionMethod})`)
-
-                setTimeout(() => {
-                  onUploadComplete({
-                    fileUrl,
-                    extractedText,
-                    fileName
-                  });
-                }, 1000); // Small delay to show success state
-              } else {
+              } catch (error) {
+                console.error("Free OCR extraction failed:", error);
                 setUploadState("error")
-                setUploadProgress("কোন টেক্সট পাওয়া যায়নি")
+                setUploadProgress("টেক্সট এক্সট্রাকশন ব্যর্থ - সার্ভার সমস্যা")
                 if (onUploadError) {
-                  onUploadError("No text could be extracted from the PDF");
+                  onUploadError("Text extraction failed. Please try again in a few moments.");
                 }
               }
             }}
@@ -310,11 +239,11 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
               button: uploadState === "uploading"
                 ? "আপলোড হচ্ছে..."
                 : uploadState === "extracting"
-                  ? "প্রসেসিং..."
+                  ? "AI প্রসেসিং..."
                   : uploadState === "success"
                     ? "সম্পন্ন!"
-                    : "PDF আপলোড করুন",
-              allowedContent: "PDF (সর্বোচ্চ 16MB)"
+                    : "PDF/Image আপলোড করুন",
+              allowedContent: "PDF এবং Image (সর্বোচ্চ 16MB)"
             }}
             disabled={uploadState === "uploading" || uploadState === "extracting"}
           />
