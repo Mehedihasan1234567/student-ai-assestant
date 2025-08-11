@@ -548,44 +548,164 @@ export default function UploadNotesPage() {
         <Card className="rounded-xl shadow-lg border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20">
           <CardHeader>
             <CardTitle className="text-purple-800 dark:text-purple-200 flex items-center gap-2">
-              ❓ AI কুইজ
+              🧠 AI-Generated Smart Quiz
             </CardTitle>
-            <CardDescription className="text-purple-600 dark:text-purple-300">AI দ্বারা তৈরি করা কুইজ প্রশ্ন</CardDescription>
+            <CardDescription className="text-purple-600 dark:text-purple-300">
+              Intelligent questions generated from your content using advanced AI analysis
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            {/* AI Analysis Insights */}
+            {generatedQuiz.analysis && (
+              <div className="mb-6 p-4 bg-white dark:bg-neutral-800 rounded-lg border border-purple-200 dark:border-purple-700">
+                <h5 className="text-purple-700 dark:text-purple-300 font-medium mb-3 flex items-center gap-2">
+                  🧠 AI Content Analysis & Question Generation
+                </h5>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm mb-4">
+                  <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
+                    <div className="font-bold text-purple-800 dark:text-purple-200">{generatedQuiz.analysis.keyTermsFound}</div>
+                    <div className="text-purple-600 dark:text-purple-400">Key Terms</div>
+                  </div>
+                  <div className="text-center p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded">
+                    <div className="font-bold text-indigo-800 dark:text-indigo-200">{generatedQuiz.analysis.definitionsFound}</div>
+                    <div className="text-indigo-600 dark:text-indigo-400">Definitions</div>
+                  </div>
+                  <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    <div className="font-bold text-blue-800 dark:text-blue-200">{generatedQuiz.analysis.factsFound || 0}</div>
+                    <div className="text-blue-600 dark:text-blue-400">Facts</div>
+                  </div>
+                  <div className="text-center p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded">
+                    <div className="font-bold text-cyan-800 dark:text-cyan-200">{generatedQuiz.analysis.examplesFound || 0}</div>
+                    <div className="text-cyan-600 dark:text-cyan-400">Examples</div>
+                  </div>
+                  <div className="text-center p-2 bg-violet-50 dark:bg-violet-900/20 rounded">
+                    <div className="font-bold text-violet-800 dark:text-violet-200">{generatedQuiz.analysis.readingLevel}</div>
+                    <div className="text-violet-600 dark:text-violet-400">Level</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                    <span className="font-medium text-green-700 dark:text-green-300">Complexity: </span>
+                    <span className="text-green-600 dark:text-green-400">{generatedQuiz.analysis.contentComplexity}</span>
+                  </div>
+                  <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
+                    <span className="font-medium text-orange-700 dark:text-orange-300">AI Generated: </span>
+                    <span className="text-orange-600 dark:text-orange-400">5 Dynamic Questions</span>
+                  </div>
+                </div>
+
+                {generatedQuiz.analysis.topKeywords && generatedQuiz.analysis.topKeywords.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-purple-200 dark:border-purple-700">
+                    <span className="text-purple-700 dark:text-purple-300 text-sm font-medium">🎯 AI Detected Keywords: </span>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {generatedQuiz.analysis.topKeywords.map((keyword: string, idx: number) => (
+                        <span key={idx} className="px-2 py-1 bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quiz Stats */}
+            <div className="mb-6 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10 rounded-lg border border-purple-200 dark:border-purple-700">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-purple-700 dark:text-purple-300 font-medium">
+                  📊 Quiz Overview
+                </span>
+                <div className="flex gap-4">
+                  <span className="text-purple-600 dark:text-purple-400">
+                    Questions: {generatedQuiz.questions?.length || 0}
+                  </span>
+                  <span className="text-purple-600 dark:text-purple-400">
+                    Type: Multiple Choice
+                  </span>
+                  <span className="text-green-600 dark:text-green-400">
+                    AI Generated: ✅
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
               {generatedQuiz.questions && generatedQuiz.questions.map((question: any, index: number) => (
-                <div key={index} className="bg-white dark:bg-neutral-800 p-4 rounded-lg border border-purple-200 dark:border-purple-700 shadow-sm">
-                  <h4 className="font-semibold text-purple-800 dark:text-purple-200 mb-3">
-                    প্রশ্ন {index + 1}: {question.question}
-                  </h4>
-                  <div className="space-y-2">
+                <div key={index} className="bg-white dark:bg-neutral-800 p-5 rounded-xl border border-purple-200 dark:border-purple-700 shadow-sm hover:shadow-md transition-shadow">
+                  {/* Question Header */}
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                      <span className="text-purple-700 dark:text-purple-300 font-bold text-sm">{index + 1}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-base leading-relaxed">
+                        {question.question}
+                      </h4>
+                    </div>
+                  </div>
+
+                  {/* Options */}
+                  <div className="space-y-3 ml-11">
                     {question.options && question.options.map((option: string, optIndex: number) => (
                       <div
                         key={optIndex}
                         className={cn(
-                          "p-3 rounded-lg border text-sm transition-all duration-200",
+                          "p-4 rounded-lg border text-sm transition-all duration-200 cursor-pointer",
                           optIndex === question.correctAnswer
-                            ? "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200 shadow-sm"
-                            : "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                            ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200 shadow-sm ring-2 ring-green-200 dark:ring-green-800"
+                            : "bg-purple-25 dark:bg-purple-900/10 border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-600"
                         )}
                       >
-                        <span className="font-medium text-purple-800 dark:text-purple-200">{String.fromCharCode(65 + optIndex)})</span> {option}
-                        {optIndex === question.correctAnswer && (
-                          <span className="ml-2 text-green-600 dark:text-green-400 font-medium">✓ সঠিক উত্তর</span>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center text-xs font-medium text-purple-700 dark:text-purple-300">
+                            {String.fromCharCode(65 + optIndex)}
+                          </span>
+                          <span className="flex-1">{option}</span>
+                          {optIndex === question.correctAnswer && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-green-600 dark:text-green-400 font-medium text-xs">✓ Correct</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
+
+                  {/* Explanation */}
                   {question.explanation && (
-                    <div className="mt-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-700">
-                      <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                        <strong>ব্যাখ্যা:</strong> {question.explanation}
-                      </p>
+                    <div className="mt-4 ml-11 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                      <div className="flex items-start gap-2">
+                        <span className="text-indigo-600 dark:text-indigo-400 text-sm font-medium">💡</span>
+                        <p className="text-sm text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                          <strong>Explanation:</strong> {question.explanation}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Quiz Footer */}
+            <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-purple-700 dark:text-purple-300 text-sm">🎯 Study Tip:</span>
+                  <span className="text-purple-600 dark:text-purple-400 text-sm">
+                    Review each explanation to understand the reasoning behind correct answers
+                  </span>
+                </div>
+                <Button
+                  onClick={() => handleGenerateQuiz()}
+                  variant="outline"
+                  size="sm"
+                  className="border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/20"
+                  disabled={isGenerating}
+                >
+                  🔄 Generate New Quiz
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
