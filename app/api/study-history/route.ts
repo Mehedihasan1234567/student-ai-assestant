@@ -1,17 +1,22 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { studyHistory, notes, summaries, quizzes, quizAttempts } from "@/lib/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "20");
     const action = searchParams.get("action"); // filter by action type
 
-    console.log("Study history API called");
-
-    // Build query with joins to get related data
     let query = db
       .select({
         id: studyHistory.id,
@@ -23,18 +28,17 @@ export async function GET(req: Request) {
       })
       .from(studyHistory)
       .leftJoin(notes, eq(studyHistory.noteId, notes.id))
+      .where(eq(studyHistory.userId, userId))
       .orderBy(desc(studyHistory.createdAt))
       .limit(limit);
 
-    // Add action filter if specified
     if (action) {
       query = query.where(eq(studyHistory.action, action));
     }
 
     const history = await query;
 
-    // Get summary statistics
-    const stats = await db
+    const statsQuery = db
       .select({
         totalNotes: sql<number>`count(distinct ${notes.id})`,
         totalSummaries: sql<number>`count(distinct ${summaries.id})`,
@@ -44,25 +48,27 @@ export async function GET(req: Request) {
       .from(notes)
       .leftJoin(summaries, eq(notes.id, summaries.noteId))
       .leftJoin(quizzes, eq(notes.id, quizzes.noteId))
-      .leftJoin(quizAttempts, eq(quizzes.id, quizAttempts.quizId));
+      .leftJoin(quizAttempts, eq(quizzes.id, quizAttempts.quizId))
+      .where(eq(notes.userId, userId));
 
-    // Get recent activity summary
+    const stats = await statsQuery;
+
     const recentActivity = await db
       .select({
         action: studyHistory.action,
         count: sql<number>`count(*)`,
       })
       .from(studyHistory)
-      .where(sql`${studyHistory.createdAt} >= NOW() - INTERVAL '7 days'`)
+      .where(and(eq(studyHistory.userId, userId), sql`${studyHistory.createdAt} >= NOW() - INTERVAL '7 days'`))
       .groupBy(studyHistory.action);
 
-    // Calculate average quiz scores
     const avgQuizScore = await db
       .select({
         avgScore: sql<number>`avg(${quizAttempts.score}::float / ${quizAttempts.totalQuestions} * 100)`,
         totalAttempts: sql<number>`count(*)`,
       })
-      .from(quizAttempts);
+      .from(quizAttempts)
+      .where(eq(quizAttempts.userId, userId));
 
     return NextResponse.json({
       success: true,
@@ -74,7 +80,6 @@ export async function GET(req: Request) {
           createdAt: item.createdAt,
           noteTitle: item.noteTitle,
           noteId: item.noteId,
-          // Add Bengali action labels
           actionLabel: getActionLabel(item.action),
         })),
         statistics: {

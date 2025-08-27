@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { summaries, notes } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(req.url);
     const noteId = searchParams.get("noteId");
     const limit = parseInt(searchParams.get("limit") || "10");
-
-    console.log("Get summaries API called");
 
     let query = db
       .select({
@@ -23,6 +29,7 @@ export async function GET(req: Request) {
       })
       .from(summaries)
       .leftJoin(notes, eq(summaries.noteId, notes.id))
+      .where(eq(summaries.userId, userId))
       .orderBy(desc(summaries.createdAt))
       .limit(limit);
 
@@ -52,6 +59,12 @@ export async function GET(req: Request) {
 // Get single summary by ID
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { summaryId } = await req.json();
 
     if (!summaryId) {
@@ -74,7 +87,7 @@ export async function POST(req: Request) {
       })
       .from(summaries)
       .leftJoin(notes, eq(summaries.noteId, notes.id))
-      .where(eq(summaries.id, parseInt(summaryId)));
+      .where(and(eq(summaries.id, parseInt(summaryId)), eq(summaries.userId, userId)));
 
     if (!summary) {
       return NextResponse.json({ error: "Summary not found" }, { status: 404 });

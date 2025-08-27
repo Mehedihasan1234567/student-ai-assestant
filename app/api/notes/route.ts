@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { notes, summaries, quizzes, studyHistory } from "@/lib/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "10");
     const noteId = searchParams.get("noteId");
-
-    console.log("Get notes API called");
 
     if (noteId) {
       // Get single note with related data
@@ -26,7 +32,7 @@ export async function GET(req: Request) {
         .from(notes)
         .leftJoin(summaries, eq(notes.id, summaries.noteId))
         .leftJoin(quizzes, eq(notes.id, quizzes.noteId))
-        .where(eq(notes.id, parseInt(noteId)))
+        .where(and(eq(notes.id, parseInt(noteId)), eq(notes.userId, userId)))
         .groupBy(notes.id);
 
       if (!note) {
@@ -35,6 +41,7 @@ export async function GET(req: Request) {
 
       // Track view in study history
       await db.insert(studyHistory).values({
+        userId,
         noteId: parseInt(noteId),
         action: "review",
         details: { type: "note_view" }
@@ -60,6 +67,7 @@ export async function GET(req: Request) {
       .from(notes)
       .leftJoin(summaries, eq(notes.id, summaries.noteId))
       .leftJoin(quizzes, eq(notes.id, quizzes.noteId))
+      .where(eq(notes.userId, userId))
       .groupBy(notes.id)
       .orderBy(desc(notes.createdAt))
       .limit(limit);
@@ -81,6 +89,12 @@ export async function GET(req: Request) {
 // Create or update note
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { title, content, fileUrl } = await req.json();
 
     if (!title || !content) {
@@ -88,6 +102,7 @@ export async function POST(req: Request) {
     }
 
     const [savedNote] = await db.insert(notes).values({
+      userId,
       title,
       content,
       fileUrl: fileUrl || null,
@@ -95,6 +110,7 @@ export async function POST(req: Request) {
 
     // Track in study history
     await db.insert(studyHistory).values({
+      userId,
       noteId: savedNote.id,
       action: "upload",
       details: { 

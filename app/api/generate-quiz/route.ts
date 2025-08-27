@@ -2,9 +2,17 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { quizzes, studyHistory } from "@/lib/db/schema";
 import { AIQuizGenerator } from "@/lib/ai-quiz-generator";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { noteId, content, title, difficulty = "medium" } = await req.json();
     console.log("Generate quiz API called for note:", noteId);
     console.log("Content length:", content.length);
@@ -76,6 +84,7 @@ export async function POST(req: Request) {
     const [savedQuiz] = await db
       .insert(quizzes)
       .values({
+        userId,
         noteId: parseInt(noteId),
         title: title ? `${title} - Quiz` : "Study Quiz",
         questions: quizData.questions,
@@ -84,6 +93,7 @@ export async function POST(req: Request) {
 
     // Track in study history
     await db.insert(studyHistory).values({
+      userId,
       noteId: parseInt(noteId),
       action: "quiz",
       details: {

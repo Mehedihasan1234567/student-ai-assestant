@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { summaries, studyHistory } from "@/lib/db/schema";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { noteId, content, title } = await req.json();
     console.log("Generate summary API called for note:", noteId);
 
@@ -149,6 +157,7 @@ export async function POST(req: Request) {
     const [savedSummary] = await db
       .insert(summaries)
       .values({
+        userId,
         noteId: parseInt(noteId),
         title: title || "AI Generated Summary",
         summary:
@@ -163,6 +172,7 @@ export async function POST(req: Request) {
 
     // Track in study history
     await db.insert(studyHistory).values({
+      userId,
       noteId: parseInt(noteId),
       action: "summary",
       details: { summaryId: savedSummary.id, method: "ai_generated" },

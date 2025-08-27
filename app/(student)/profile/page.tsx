@@ -16,8 +16,8 @@ export default function ProfilePage() {
   const { theme, setTheme } = useTheme()
   const router = useRouter()
 
-  const [name, setName] = React.useState<string>(() => localStorage.getItem("profile:name") || "Student")
-  const [email, setEmail] = React.useState<string>(() => localStorage.getItem("profile:email") || "student@example.com")
+  const [name, setName] = React.useState("")
+  const [email, setEmail] = React.useState("")
   const [notify, setNotify] = React.useState<boolean>(() => localStorage.getItem("profile:notify") === "true")
 
   // Password form state
@@ -25,11 +25,30 @@ export default function ProfilePage() {
   const [newPwd, setNewPwd] = React.useState("")
   const [confirmPwd, setConfirmPwd] = React.useState("")
 
-  const saveProfile = () => {
-    localStorage.setItem("profile:name", name)
-    localStorage.setItem("profile:email", email)
-    localStorage.setItem("profile:notify", String(notify))
-    toast({ title: "Saved", description: "Your profile has been updated." })
+  React.useEffect(() => {
+    const fetchUser = async () => {
+      const res = await fetch("/api/users/me");
+      if (res.ok) {
+        const user = await res.json();
+        setName(user.name || "");
+        setEmail(user.email || "");
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const saveProfile = async () => {
+    const res = await fetch("/api/users/me", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+
+    if (res.ok) {
+      toast({ title: "Saved", description: "Your profile has been updated." })
+    } else {
+      toast({ title: "Error", description: "Failed to update profile." })
+    }
   }
 
   const changePassword = () => {

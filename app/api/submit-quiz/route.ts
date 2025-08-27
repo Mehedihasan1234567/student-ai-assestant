@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { quizAttempts, quizzes, studyHistory } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { quizId, answers } = await req.json();
     console.log("Submit quiz API called for quiz:", quizId);
 
@@ -13,7 +21,7 @@ export async function POST(req: Request) {
     }
 
     // Get quiz questions from database
-    const [quiz] = await db.select().from(quizzes).where(eq(quizzes.id, parseInt(quizId)));
+    const [quiz] = await db.select().from(quizzes).where(and(eq(quizzes.id, parseInt(quizId)), eq(quizzes.userId, userId)));
     
     if (!quiz) {
       return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
@@ -49,6 +57,7 @@ export async function POST(req: Request) {
 
     // Save quiz attempt to database
     const [savedAttempt] = await db.insert(quizAttempts).values({
+      userId,
       quizId: parseInt(quizId),
       score,
       totalQuestions,
@@ -57,6 +66,7 @@ export async function POST(req: Request) {
 
     // Track in study history
     await db.insert(studyHistory).values({
+      userId,
       noteId: quiz.noteId,
       action: "quiz_attempt",
       details: { 

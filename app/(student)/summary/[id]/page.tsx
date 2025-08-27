@@ -9,34 +9,44 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
-type StoredSummary = {
+type Summary = {
   id: string
   title: string
   summary: string
+  noteId: number
 }
 
 export default function SummaryPage() {
   const { id } = useParams<{ id: string }>()
   const { toast } = useToast()
   const router = useRouter()
-  const [data, setData] = React.useState<StoredSummary | null>(null)
+  const [data, setData] = React.useState<Summary | null>(null)
 
   React.useEffect(() => {
     if (!id) return
-    const raw = localStorage.getItem(`summary:${id}`)
-    if (raw) {
-      try {
-        setData(JSON.parse(raw) as StoredSummary)
-        return
-      } catch {}
-    }
-    // Fallback placeholder
-    setData({
-      id: String(id),
-      title: "Untitled Notes",
-      summary:
-        "No saved summary was found for this upload. This is a placeholder. Paste or generate a new summary to continue.",
-    })
+
+    const fetchSummary = async () => {
+      const res = await fetch("/api/summaries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summaryId: id }),
+      });
+
+      if (res.ok) {
+        const summaryData = await res.json();
+        setData(summaryData.summary);
+      } else {
+        setData({
+          id: String(id),
+          title: "Untitled Notes",
+          summary:
+            "No saved summary was found for this upload. This is a placeholder. Paste or generate a new summary to continue.",
+          noteId: 0,
+        })
+      }
+    };
+
+    fetchSummary();
   }, [id])
 
   const handleCopy = async () => {
@@ -74,9 +84,8 @@ export default function SummaryPage() {
   }
 
   const handleGenerateQuiz = () => {
-    // In a real app, persist state to generate quiz based on this summary
-    toast({ title: "Generating quiz", description: "Opening quiz section..." })
-    router.push("/quizzes")
+    if (!data) return;
+    router.push(`/quizzes?noteId=${data.noteId}`)
   }
 
   return (
