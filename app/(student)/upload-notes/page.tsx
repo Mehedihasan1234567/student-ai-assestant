@@ -1,130 +1,162 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Calendar, FileText, CheckCircle, RefreshCw } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { PdfDropzone } from "@/components/pdf-dropzone"
-import { cn } from "@/lib/utils"
-import { useToast } from "@/hooks/use-toast"
+import * as React from "react";
+import { Calendar, FileText, CheckCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PdfDropzone } from "@/components/pdf-dropzone";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 type UploadRecord = {
-  id: string
-  name: string
-  size: number
-  dateISO: string
-  extractedText?: string
-  fileUrl?: string
-}
+  id: string;
+  name: string;
+  size: number;
+  dateISO: string;
+  extractedText?: string;
+  fileUrl?: string;
+};
 
 export default function UploadNotesPage() {
-  const { toast } = useToast()
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
-  const [extractedText, setExtractedText] = React.useState<string>("")
-  const [uploadResult, setUploadResult] = React.useState<any>(null)
-  const [recent, setRecent] = React.useState<UploadRecord[]>([])
-  const [isUploading, setIsUploading] = React.useState(false)
-  const [isGenerating, setIsGenerating] = React.useState(false)
-  const [generatingType, setGeneratingType] = React.useState<'summary' | 'quiz' | null>(null)
-  const [currentNoteId, setCurrentNoteId] = React.useState<number | null>(null)
-  const [generatedSummary, setGeneratedSummary] = React.useState<any>(null)
-  const [generatedQuiz, setGeneratedQuiz] = React.useState<any>(null)
-  const [autoGenerate, setAutoGenerate] = React.useState(true)
+  const { toast } = useToast();
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [extractedText, setExtractedText] = React.useState<string>("");
+  const [uploadResult, setUploadResult] = React.useState<any>(null);
+  const [recent, setRecent] = React.useState<UploadRecord[]>([]);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [generatingType, setGeneratingType] = React.useState<
+    "summary" | "quiz" | null
+  >(null);
+  const [currentNoteId, setCurrentNoteId] = React.useState<number | null>(null);
+  const [generatedSummary, setGeneratedSummary] = React.useState<any>(null);
+  const [generatedQuiz, setGeneratedQuiz] = React.useState<any>(null);
+  const [autoGenerate, setAutoGenerate] = React.useState(true);
 
   React.useEffect(() => {
-    const raw = localStorage.getItem("recentUploads") || "[]"
+    const raw = localStorage.getItem("recentUploads") || "[]";
     try {
-      const arr: UploadRecord[] = JSON.parse(raw)
-      const sorted = [...arr].sort((a, b) => (a.dateISO < b.dateISO ? 1 : -1))
-      setRecent(sorted.slice(0, 3))
+      const arr: UploadRecord[] = JSON.parse(raw);
+      const sorted = [...arr].sort((a, b) => (a.dateISO < b.dateISO ? 1 : -1));
+      setRecent(sorted.slice(0, 3));
     } catch {
-      setRecent([])
+      setRecent([]);
     }
-  }, [])
+  }, []);
 
   const handleFileSelect = (file: File) => {
-    setSelectedFile(file)
-    setExtractedText("")
-    setUploadResult(null)
-    setIsUploading(true)
-  }
+    setSelectedFile(file);
+    setExtractedText("");
+    setUploadResult(null);
+    setIsUploading(true);
+  };
 
-  const handleUploadComplete = async (result: { fileUrl: string; extractedText: string; fileName: string }) => {
-    setIsUploading(false)
-    setExtractedText(result.extractedText)
+  const handleUploadComplete = async (result: {
+    fileUrl: string;
+    extractedText: string;
+    fileName: string;
+  }) => {
+    setIsUploading(false);
+    setExtractedText(result.extractedText);
     setUploadResult({
       message: "✅ ফাইল সফলভাবে আপলোড এবং প্রসেস করা হয়েছে",
       fileName: result.fileName,
       textLength: result.extractedText.length,
       extractedText: result.extractedText,
-      fileUrl: result.fileUrl
-    })
+      fileUrl: result.fileUrl,
+    });
 
     // Save to recent uploads
     const record: UploadRecord = {
       id: Date.now().toString(),
-      name: result.fileName.replace(/\.(pdf|jpg|jpeg|png|webp|gif|bmp)$/i, ''),
+      name: result.fileName.replace(/\.(pdf|jpg|jpeg|png|webp|gif|bmp)$/i, ""),
       size: selectedFile?.size || 0,
       dateISO: new Date().toISOString(),
       extractedText: result.extractedText,
-      fileUrl: result.fileUrl
-    }
+      fileUrl: result.fileUrl,
+    };
 
-    const raw = localStorage.getItem("recentUploads") || "[]"
-    let list: UploadRecord[] = []
+    const raw = localStorage.getItem("recentUploads") || "[]";
+    let list: UploadRecord[] = [];
     try {
-      list = JSON.parse(raw)
+      list = JSON.parse(raw);
     } catch {
-      list = []
+      list = [];
     }
-    localStorage.setItem("recentUploads", JSON.stringify([record, ...list].slice(0, 25)))
-    setRecent([record, ...recent].slice(0, 3))
+    localStorage.setItem(
+      "recentUploads",
+      JSON.stringify([record, ...list].slice(0, 25))
+    );
+    setRecent([record, ...recent].slice(0, 3));
 
     toast({
       title: "সফল!",
       description: "ফাইল আপলোড এবং টেক্সট এক্সট্রাক্ট সম্পন্ন হয়েছে",
-    })
+    });
 
     // Auto-generate summary and quiz if enabled
-    if (autoGenerate && result.extractedText && result.extractedText.trim().length > 50) {
+    if (
+      autoGenerate &&
+      result.extractedText &&
+      result.extractedText.trim().length > 50
+    ) {
       // Check if the extracted text is an error message
-      const errorKeywords = ["API access denied", "error", "failed", "trouble", "permission", "key", "sorry"];
-      const isErrorContent = errorKeywords.some(keyword =>
+      const errorKeywords = [
+        "API access denied",
+        "error",
+        "failed",
+        "trouble",
+        "permission",
+        "key",
+        "sorry",
+      ];
+      const isErrorContent = errorKeywords.some((keyword) =>
         result.extractedText.toLowerCase().includes(keyword.toLowerCase())
       );
 
       if (!isErrorContent) {
-        await autoGenerateContent(result)
+        await autoGenerateContent(result);
       } else {
         toast({
           title: "স্বয়ংক্রিয় প্রসেসিং বন্ধ",
-          description: "টেক্সট এক্সট্রাকশনে সমস্যা হওয়ায় স্বয়ংক্রিয় সারসংক্ষেপ ও কুইজ তৈরি করা হয়নি",
-          variant: "destructive"
-        })
+          description:
+            "টেক্সট এক্সট্রাকশনে সমস্যা হওয়ায় স্বয়ংক্রিয় সারসংক্ষেপ ও কুইজ তৈরি করা হয়নি",
+          variant: "destructive",
+        });
       }
     }
-  }
+  };
 
   const handleUploadError = (error: string) => {
-    setIsUploading(false)
+    setIsUploading(false);
     toast({
       title: "আপলোড ব্যর্থ",
       description: error,
-      variant: "destructive"
-    })
-  }
+      variant: "destructive",
+    });
+  };
 
   const handleReset = () => {
-    setSelectedFile(null)
-    setExtractedText("")
-    setUploadResult(null)
-    setIsUploading(false)
-    setGeneratedSummary(null)
-    setGeneratedQuiz(null)
-    setCurrentNoteId(null)
-  }
+    setSelectedFile(null);
+    setExtractedText("");
+    setUploadResult(null);
+    setIsUploading(false);
+    setGeneratedSummary(null);
+    setGeneratedQuiz(null);
+    setCurrentNoteId(null);
+  };
 
-  const autoGenerateContent = async (result: { fileUrl: string; extractedText: string; fileName: string }) => {
+  const autoGenerateContent = async (result: {
+    fileUrl: string;
+    extractedText: string;
+    fileName: string;
+  }) => {
     try {
       // First save the note
       const noteResponse = await fetch("/api/notes", {
@@ -133,15 +165,15 @@ export default function UploadNotesPage() {
         body: JSON.stringify({
           title: result.fileName || "Uploaded Document",
           content: result.extractedText,
-          fileUrl: result.fileUrl
+          fileUrl: result.fileUrl,
         }),
-      })
+      });
 
-      const noteData = await noteResponse.json()
-      let noteId = null
+      const noteData = await noteResponse.json();
+      let noteId = null;
       if (noteData.success) {
-        noteId = noteData.note.id
-        setCurrentNoteId(noteId)
+        noteId = noteData.note.id;
+        setCurrentNoteId(noteId);
       }
 
       // Generate both summary and quiz simultaneously
@@ -153,7 +185,7 @@ export default function UploadNotesPage() {
           body: JSON.stringify({
             noteId: noteId?.toString() || "temp",
             content: result.extractedText,
-            title: result.fileName || "Auto Summary"
+            title: result.fileName || "Auto Summary",
           }),
         }),
         // Generate Quiz
@@ -164,54 +196,54 @@ export default function UploadNotesPage() {
             noteId: noteId?.toString() || "temp",
             content: result.extractedText,
             title: result.fileName || "Auto Quiz",
-            difficulty: "medium"
+            difficulty: "medium",
           }),
-        })
-      ])
+        }),
+      ]);
 
       // Handle Summary Result
-      if (summaryPromise.status === 'fulfilled') {
-        const summaryData = await summaryPromise.value.json()
+      if (summaryPromise.status === "fulfilled") {
+        const summaryData = await summaryPromise.value.json();
         if (summaryData.success) {
-          setGeneratedSummary(summaryData.summary)
+          setGeneratedSummary(summaryData.summary);
           toast({
             title: "সারসংক্ষেপ তৈরি!",
             description: "AI স্বয়ংক্রিয়ভাবে সারসংক্ষেপ তৈরি করেছে",
-          })
+          });
         }
       }
 
       // Handle Quiz Result
-      if (quizPromise.status === 'fulfilled') {
-        const quizData = await quizPromise.value.json()
+      if (quizPromise.status === "fulfilled") {
+        const quizData = await quizPromise.value.json();
         if (quizData.success) {
-          setGeneratedQuiz(quizData.quiz)
+          setGeneratedQuiz(quizData.quiz);
           toast({
             title: "কুইজ তৈরি!",
             description: "AI স্বয়ংক্রিয়ভাবে কুইজ তৈরি করেছে",
-          })
+          });
         }
       }
-
     } catch (error) {
-      console.error("Auto-generation error:", error)
+      console.error("Auto-generation error:", error);
       toast({
         title: "স্বয়ংক্রিয় তৈরি ব্যর্থ",
-        description: "সারসংক্ষেপ এবং কুইজ স্বয়ংক্রিয়ভাবে তৈরি করতে সমস্যা হয়েছে",
-        variant: "destructive"
-      })
+        description:
+          "সারসংক্ষেপ এবং কুইজ স্বয়ংক্রিয়ভাবে তৈরি করতে সমস্যা হয়েছে",
+        variant: "destructive",
+      });
     }
-  }
+  };
 
   const handleGenerateSummary = async () => {
-    if (!extractedText || !uploadResult) return
+    if (!extractedText || !uploadResult) return;
 
-    setIsGenerating(true)
-    setGeneratingType('summary')
+    setIsGenerating(true);
+    setGeneratingType("summary");
 
     try {
       // First save the note if not already saved
-      let noteId = currentNoteId
+      let noteId = currentNoteId;
       if (!noteId) {
         const noteResponse = await fetch("/api/notes", {
           method: "POST",
@@ -219,14 +251,14 @@ export default function UploadNotesPage() {
           body: JSON.stringify({
             title: uploadResult.fileName || "Uploaded Note",
             content: extractedText,
-            fileUrl: uploadResult.fileUrl
+            fileUrl: uploadResult.fileUrl,
           }),
-        })
+        });
 
-        const noteData = await noteResponse.json()
+        const noteData = await noteResponse.json();
         if (noteData.success) {
-          noteId = noteData.note.id
-          setCurrentNoteId(noteId)
+          noteId = noteData.note.id;
+          setCurrentNoteId(noteId);
         }
       }
 
@@ -237,47 +269,47 @@ export default function UploadNotesPage() {
         body: JSON.stringify({
           noteId: noteId.toString(),
           content: extractedText,
-          title: uploadResult.fileName || "Summary"
+          title: uploadResult.fileName || "Summary",
         }),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (data.success) {
-        setGeneratedSummary(data.summary)
+        setGeneratedSummary(data.summary);
         toast({
           title: "সফল!",
           description: "সারসংক্ষেপ তৈরি করা হয়েছে",
-        })
+        });
       } else {
         toast({
           title: "ব্যর্থ",
           description: data.error || "সারসংক্ষেপ তৈরি করতে সমস্যা হয়েছে",
-          variant: "destructive"
-        })
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error("Summary generation error:", error)
+      console.error("Summary generation error:", error);
       toast({
         title: "এরর",
         description: "সারসংক্ষেপ তৈরি করতে সমস্যা হয়েছে",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     } finally {
-      setIsGenerating(false)
-      setGeneratingType(null)
+      setIsGenerating(false);
+      setGeneratingType(null);
     }
-  }
+  };
 
   const handleGenerateQuiz = async () => {
-    if (!extractedText || !uploadResult) return
+    if (!extractedText || !uploadResult) return;
 
-    setIsGenerating(true)
-    setGeneratingType('quiz')
+    setIsGenerating(true);
+    setGeneratingType("quiz");
 
     try {
       // First save the note if not already saved
-      let noteId = currentNoteId
+      let noteId = currentNoteId;
       if (!noteId) {
         const noteResponse = await fetch("/api/notes", {
           method: "POST",
@@ -285,14 +317,14 @@ export default function UploadNotesPage() {
           body: JSON.stringify({
             title: uploadResult.fileName || "Uploaded Note",
             content: extractedText,
-            fileUrl: uploadResult.fileUrl
+            fileUrl: uploadResult.fileUrl,
           }),
-        })
+        });
 
-        const noteData = await noteResponse.json()
+        const noteData = await noteResponse.json();
         if (noteData.success) {
-          noteId = noteData.note.id
-          setCurrentNoteId(noteId)
+          noteId = noteData.note.id;
+          setCurrentNoteId(noteId);
         }
       }
 
@@ -304,60 +336,68 @@ export default function UploadNotesPage() {
           noteId: noteId.toString(),
           content: extractedText,
           title: uploadResult.fileName || "Quiz",
-          difficulty: "medium"
+          difficulty: "medium",
         }),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (data.success) {
-        setGeneratedQuiz(data.quiz)
+        setGeneratedQuiz(data.quiz);
         toast({
           title: "সফল!",
           description: "কুইজ তৈরি করা হয়েছে",
-        })
+        });
       } else {
         toast({
           title: "ব্যর্থ",
           description: data.error || "কুইজ তৈরি করতে সমস্যা হয়েছে",
-          variant: "destructive"
-        })
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error("Quiz generation error:", error)
+      console.error("Quiz generation error:", error);
       toast({
         title: "এরর",
         description: "কুইজ তৈরি করতে সমস্যা হয়েছে",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     } finally {
-      setIsGenerating(false)
-      setGeneratingType(null)
+      setIsGenerating(false);
+      setGeneratingType(null);
     }
-  }
+  };
 
   const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Upload Section */}
       <Card className="rounded-xl shadow-lg">
         <CardHeader>
-          <CardTitle className="text-neutral-900 dark:text-neutral-100">Image/PDF আপলোড করুন</CardTitle>
-          <CardDescription>আপনার Image বা PDF আপলোড করুন এবং AI দিয়ে টেক্সট এক্সট্রাক্ট করুন</CardDescription>
+          <CardTitle className="text-neutral-900 dark:text-neutral-100">
+            Image/PDF আপলোড করুন
+          </CardTitle>
+          <CardDescription>
+            আপনার Image বা PDF আপলোড করুন এবং AI দিয়ে টেক্সট এক্সট্রাক্ট করুন
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Auto-generation Toggle */}
           <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <div>
-              <h4 className="font-medium text-blue-800 dark:text-blue-200">🤖 স্বয়ংক্রিয় AI প্রসেসিং</h4>
-              <p className="text-sm text-blue-600 dark:text-blue-300">আপলোডের পর স্বয়ংক্রিয়ভাবে সারসংক্ষেপ এবং কুইজ তৈরি করুন</p>
+              <h4 className="font-medium text-blue-800 dark:text-blue-200">
+                🤖 স্বয়ংক্রিয় AI প্রসেসিং
+              </h4>
+              <p className="text-sm text-blue-600 dark:text-blue-300">
+                আপলোডের পর স্বয়ংক্রিয়ভাবে সারসংক্ষেপ এবং কুইজ তৈরি করুন
+              </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -371,7 +411,7 @@ export default function UploadNotesPage() {
           </div>
 
           {/* Demo Button */}
-          <div className="flex items-center justify-center p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+          {/* <div className="flex items-center justify-center p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
             <Button
               onClick={async () => {
                 try {
@@ -397,7 +437,7 @@ export default function UploadNotesPage() {
             >
               🚀 ডেমো কন্টেন্ট দিয়ে টেস্ট করুন
             </Button>
-          </div>
+          </div> */}
 
           {/* Using your PdfDropzone component */}
           <PdfDropzone
@@ -473,14 +513,17 @@ export default function UploadNotesPage() {
                   size="sm"
                   disabled={isGenerating}
                 >
-                  {isGenerating && generatingType === 'summary' ? (
+                  {isGenerating && generatingType === "summary" ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       তৈরি হচ্ছে...
                     </>
                   ) : (
                     <>
-                      📝 {generatedSummary ? 'নতুন সারসংক্ষেপ তৈরি করুন' : 'সারসংক্ষেপ তৈরি করুন'}
+                      📝{" "}
+                      {generatedSummary
+                        ? "নতুন সারসংক্ষেপ তৈরি করুন"
+                        : "সারসংক্ষেপ তৈরি করুন"}
                     </>
                   )}
                 </Button>
@@ -491,14 +534,15 @@ export default function UploadNotesPage() {
                   size="sm"
                   disabled={isGenerating}
                 >
-                  {isGenerating && generatingType === 'quiz' ? (
+                  {isGenerating && generatingType === "quiz" ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       তৈরি হচ্ছে...
                     </>
                   ) : (
                     <>
-                      ❓ {generatedQuiz ? 'নতুন কুইজ তৈরি করুন' : 'কুইজ তৈরি করুন'}
+                      ❓{" "}
+                      {generatedQuiz ? "নতুন কুইজ তৈরি করুন" : "কুইজ তৈরি করুন"}
                     </>
                   )}
                 </Button>
@@ -520,21 +564,29 @@ export default function UploadNotesPage() {
           <CardContent className="space-y-4">
             <div className="prose dark:prose-invert max-w-none">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">সারসংক্ষেপ:</h4>
+                <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                  সারসংক্ষেপ:
+                </h4>
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  {typeof generatedSummary.summary === 'string'
-                    ? generatedSummary.summary.replace(/```json|```/g, '').trim()
+                  {typeof generatedSummary.summary === "string"
+                    ? generatedSummary.summary
+                        .replace(/```json|```/g, "")
+                        .trim()
                     : generatedSummary.summary}
                 </p>
               </div>
 
               {generatedSummary.keyPoints && (
                 <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                  <h4 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">মূল বিষয়সমূহ:</h4>
+                  <h4 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">
+                    মূল বিষয়সমূহ:
+                  </h4>
                   <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
-                    {generatedSummary.keyPoints.map((point: string, index: number) => (
-                      <li key={index}>• {point}</li>
-                    ))}
+                    {generatedSummary.keyPoints.map(
+                      (point: string, index: number) => (
+                        <li key={index}>• {point}</li>
+                      )
+                    )}
                   </ul>
                 </div>
               )}
@@ -551,7 +603,8 @@ export default function UploadNotesPage() {
               🧠 AI-Generated Smart Quiz
             </CardTitle>
             <CardDescription className="text-purple-600 dark:text-purple-300">
-              Intelligent questions generated from your content using advanced AI analysis
+              Intelligent questions generated from your content using advanced
+              AI analysis
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -563,50 +616,86 @@ export default function UploadNotesPage() {
                 </h5>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm mb-4">
                   <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
-                    <div className="font-bold text-purple-800 dark:text-purple-200">{generatedQuiz.analysis.keyTermsFound}</div>
-                    <div className="text-purple-600 dark:text-purple-400">Key Terms</div>
+                    <div className="font-bold text-purple-800 dark:text-purple-200">
+                      {generatedQuiz.analysis.keyTermsFound}
+                    </div>
+                    <div className="text-purple-600 dark:text-purple-400">
+                      Key Terms
+                    </div>
                   </div>
                   <div className="text-center p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded">
-                    <div className="font-bold text-indigo-800 dark:text-indigo-200">{generatedQuiz.analysis.definitionsFound}</div>
-                    <div className="text-indigo-600 dark:text-indigo-400">Definitions</div>
+                    <div className="font-bold text-indigo-800 dark:text-indigo-200">
+                      {generatedQuiz.analysis.definitionsFound}
+                    </div>
+                    <div className="text-indigo-600 dark:text-indigo-400">
+                      Definitions
+                    </div>
                   </div>
                   <div className="text-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
-                    <div className="font-bold text-blue-800 dark:text-blue-200">{generatedQuiz.analysis.factsFound || 0}</div>
-                    <div className="text-blue-600 dark:text-blue-400">Facts</div>
+                    <div className="font-bold text-blue-800 dark:text-blue-200">
+                      {generatedQuiz.analysis.factsFound || 0}
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400">
+                      Facts
+                    </div>
                   </div>
                   <div className="text-center p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded">
-                    <div className="font-bold text-cyan-800 dark:text-cyan-200">{generatedQuiz.analysis.examplesFound || 0}</div>
-                    <div className="text-cyan-600 dark:text-cyan-400">Examples</div>
+                    <div className="font-bold text-cyan-800 dark:text-cyan-200">
+                      {generatedQuiz.analysis.examplesFound || 0}
+                    </div>
+                    <div className="text-cyan-600 dark:text-cyan-400">
+                      Examples
+                    </div>
                   </div>
                   <div className="text-center p-2 bg-violet-50 dark:bg-violet-900/20 rounded">
-                    <div className="font-bold text-violet-800 dark:text-violet-200">{generatedQuiz.analysis.readingLevel}</div>
-                    <div className="text-violet-600 dark:text-violet-400">Level</div>
+                    <div className="font-bold text-violet-800 dark:text-violet-200">
+                      {generatedQuiz.analysis.readingLevel}
+                    </div>
+                    <div className="text-violet-600 dark:text-violet-400">
+                      Level
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded">
-                    <span className="font-medium text-green-700 dark:text-green-300">Complexity: </span>
-                    <span className="text-green-600 dark:text-green-400">{generatedQuiz.analysis.contentComplexity}</span>
+                    <span className="font-medium text-green-700 dark:text-green-300">
+                      Complexity:{" "}
+                    </span>
+                    <span className="text-green-600 dark:text-green-400">
+                      {generatedQuiz.analysis.contentComplexity}
+                    </span>
                   </div>
                   <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
-                    <span className="font-medium text-orange-700 dark:text-orange-300">AI Generated: </span>
-                    <span className="text-orange-600 dark:text-orange-400">5 Dynamic Questions</span>
+                    <span className="font-medium text-orange-700 dark:text-orange-300">
+                      AI Generated:{" "}
+                    </span>
+                    <span className="text-orange-600 dark:text-orange-400">
+                      5 Dynamic Questions
+                    </span>
                   </div>
                 </div>
 
-                {generatedQuiz.analysis.topKeywords && generatedQuiz.analysis.topKeywords.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-purple-200 dark:border-purple-700">
-                    <span className="text-purple-700 dark:text-purple-300 text-sm font-medium">🎯 AI Detected Keywords: </span>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {generatedQuiz.analysis.topKeywords.map((keyword: string, idx: number) => (
-                        <span key={idx} className="px-2 py-1 bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
-                          {keyword}
-                        </span>
-                      ))}
+                {generatedQuiz.analysis.topKeywords &&
+                  generatedQuiz.analysis.topKeywords.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-purple-200 dark:border-purple-700">
+                      <span className="text-purple-700 dark:text-purple-300 text-sm font-medium">
+                        🎯 AI Detected Keywords:{" "}
+                      </span>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {generatedQuiz.analysis.topKeywords.map(
+                          (keyword: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium"
+                            >
+                              {keyword}
+                            </span>
+                          )
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             )}
 
@@ -631,69 +720,85 @@ export default function UploadNotesPage() {
             </div>
 
             <div className="space-y-6">
-              {generatedQuiz.questions && generatedQuiz.questions.map((question: any, index: number) => (
-                <div key={index} className="bg-white dark:bg-neutral-800 p-5 rounded-xl border border-purple-200 dark:border-purple-700 shadow-sm hover:shadow-md transition-shadow">
-                  {/* Question Header */}
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
-                      <span className="text-purple-700 dark:text-purple-300 font-bold text-sm">{index + 1}</span>
+              {generatedQuiz.questions &&
+                generatedQuiz.questions.map((question: any, index: number) => (
+                  <div
+                    key={index}
+                    className="bg-white dark:bg-neutral-800 p-5 rounded-xl border border-purple-200 dark:border-purple-700 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    {/* Question Header */}
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                        <span className="text-purple-700 dark:text-purple-300 font-bold text-sm">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-base leading-relaxed">
+                          {question.question}
+                        </h4>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-base leading-relaxed">
-                        {question.question}
-                      </h4>
-                    </div>
-                  </div>
 
-                  {/* Options */}
-                  <div className="space-y-3 ml-11">
-                    {question.options && question.options.map((option: string, optIndex: number) => (
-                      <div
-                        key={optIndex}
-                        className={cn(
-                          "p-4 rounded-lg border text-sm transition-all duration-200 cursor-pointer",
-                          optIndex === question.correctAnswer
-                            ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200 shadow-sm ring-2 ring-green-200 dark:ring-green-800"
-                            : "bg-purple-25 dark:bg-purple-900/10 border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-600"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="flex-shrink-0 w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center text-xs font-medium text-purple-700 dark:text-purple-300">
-                            {String.fromCharCode(65 + optIndex)}
-                          </span>
-                          <span className="flex-1">{option}</span>
-                          {optIndex === question.correctAnswer && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-green-600 dark:text-green-400 font-medium text-xs">✓ Correct</span>
+                    {/* Options */}
+                    <div className="space-y-3 ml-11">
+                      {question.options &&
+                        question.options.map(
+                          (option: string, optIndex: number) => (
+                            <div
+                              key={optIndex}
+                              className={cn(
+                                "p-4 rounded-lg border text-sm transition-all duration-200 cursor-pointer",
+                                optIndex === question.correctAnswer
+                                  ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200 shadow-sm ring-2 ring-green-200 dark:ring-green-800"
+                                  : "bg-purple-25 dark:bg-purple-900/10 border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-600"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="flex-shrink-0 w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center text-xs font-medium text-purple-700 dark:text-purple-300">
+                                  {String.fromCharCode(65 + optIndex)}
+                                </span>
+                                <span className="flex-1">{option}</span>
+                                {optIndex === question.correctAnswer && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-green-600 dark:text-green-400 font-medium text-xs">
+                                      ✓ Correct
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          )}
+                          )
+                        )}
+                    </div>
+
+                    {/* Explanation */}
+                    {question.explanation && (
+                      <div className="mt-4 ml-11 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                        <div className="flex items-start gap-2">
+                          <span className="text-indigo-600 dark:text-indigo-400 text-sm font-medium">
+                            💡
+                          </span>
+                          <p className="text-sm text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                            <strong>Explanation:</strong> {question.explanation}
+                          </p>
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
-
-                  {/* Explanation */}
-                  {question.explanation && (
-                    <div className="mt-4 ml-11 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-700">
-                      <div className="flex items-start gap-2">
-                        <span className="text-indigo-600 dark:text-indigo-400 text-sm font-medium">💡</span>
-                        <p className="text-sm text-indigo-700 dark:text-indigo-300 leading-relaxed">
-                          <strong>Explanation:</strong> {question.explanation}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))}
             </div>
 
             {/* Quiz Footer */}
             <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-purple-700 dark:text-purple-300 text-sm">🎯 Study Tip:</span>
+                  <span className="text-purple-700 dark:text-purple-300 text-sm">
+                    🎯 Study Tip:
+                  </span>
                   <span className="text-purple-600 dark:text-purple-400 text-sm">
-                    Review each explanation to understand the reasoning behind correct answers
+                    Review each explanation to understand the reasoning behind
+                    correct answers
                   </span>
                 </div>
                 <Button
@@ -715,8 +820,12 @@ export default function UploadNotesPage() {
       {extractedText && (
         <Card className="rounded-xl shadow-lg">
           <CardHeader>
-            <CardTitle className="text-neutral-900 dark:text-neutral-100">এক্সট্রাক্ট করা টেক্সট</CardTitle>
-            <CardDescription>আপনার ফাইল থেকে AI দিয়ে এক্সট্রাক্ট করা টেক্সট</CardDescription>
+            <CardTitle className="text-neutral-900 dark:text-neutral-100">
+              এক্সট্রাক্ট করা টেক্সট
+            </CardTitle>
+            <CardDescription>
+              আপনার ফাইল থেকে AI দিয়ে এক্সট্রাক্ট করা টেক্সট
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="max-h-96 overflow-y-auto rounded-lg border p-4 bg-neutral-50 dark:bg-neutral-800">
@@ -734,12 +843,16 @@ export default function UploadNotesPage() {
           <CardTitle className="text-purple-800 dark:text-purple-200 flex items-center gap-2">
             🆓 Free AI-Powered Text Extraction
           </CardTitle>
-          <CardDescription>Local AI Processing দিয়ে সম্পূর্ণ ফ্রি text extraction</CardDescription>
+          <CardDescription>
+            Local AI Processing দিয়ে সম্পূর্ণ ফ্রি text extraction
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-              <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">✅ সাপোর্টেড ফাইল</h4>
+              <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">
+                ✅ সাপোর্টেড ফাইল
+              </h4>
               <ul className="text-sm text-green-700 dark:text-green-300 space-y-1">
                 <li>• PDF ডকুমেন্ট (text-based এবং image-based)</li>
                 <li>• JPG, PNG, WebP ইমেজ</li>
@@ -750,7 +863,9 @@ export default function UploadNotesPage() {
               </ul>
             </div>
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">🆓 Free AI Features</h4>
+              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+                🆓 Free AI Features
+              </h4>
               <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
                 <li>• Local AI text processing</li>
                 <li>• Free OCR for image and PDF processing</li>
@@ -763,7 +878,8 @@ export default function UploadNotesPage() {
           </div>
           <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
             <p className="text-sm text-purple-800 dark:text-purple-200">
-              <strong>🆓 Local AI Power:</strong> Local processing এর সাহায্যে সম্পূর্ণ ফ্রিতে text extraction, summary এবং quiz generation!
+              <strong>🆓 Local AI Power:</strong> Local processing এর সাহায্যে
+              সম্পূর্ণ ফ্রিতে text extraction, summary এবং quiz generation!
             </p>
           </div>
         </CardContent>
@@ -772,7 +888,9 @@ export default function UploadNotesPage() {
       {/* Recent Uploads */}
       <Card className="rounded-xl shadow-lg">
         <CardHeader>
-          <CardTitle className="text-neutral-900 dark:text-neutral-100">সাম্প্রতিক আপলোড</CardTitle>
+          <CardTitle className="text-neutral-900 dark:text-neutral-100">
+            সাম্প্রতিক আপলোড
+          </CardTitle>
           <CardDescription>আপনার সাম্প্রতিক আপলোড করা ফাইলগুলো</CardDescription>
         </CardHeader>
         <CardContent>
@@ -788,7 +906,7 @@ export default function UploadNotesPage() {
                   className="rounded-xl border p-4 bg-white dark:bg-neutral-800 hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => {
                     if (r.extractedText) {
-                      setExtractedText(r.extractedText)
+                      setExtractedText(r.extractedText);
                     }
                   }}
                 >
@@ -802,7 +920,9 @@ export default function UploadNotesPage() {
                       </p>
                       <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
                         <Calendar className="h-3 w-3" />
-                        <span>{new Date(r.dateISO).toLocaleDateString('bn-BD')}</span>
+                        <span>
+                          {new Date(r.dateISO).toLocaleDateString("bn-BD")}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -813,5 +933,5 @@ export default function UploadNotesPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

@@ -18,7 +18,7 @@ export default function ProfilePage() {
 
   const [name, setName] = React.useState("")
   const [email, setEmail] = React.useState("")
-  const [notify, setNotify] = React.useState<boolean>(() => localStorage.getItem("profile:notify") === "true")
+  const [notify, setNotify] = React.useState(false)
 
   // Password form state
   const [currPwd, setCurrPwd] = React.useState("")
@@ -35,7 +35,15 @@ export default function ProfilePage() {
       }
     };
     fetchUser();
+    const storedNotify = localStorage.getItem("profile:notify")
+    if (storedNotify) {
+      setNotify(storedNotify === "true")
+    }
   }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem("profile:notify", String(notify))
+  }, [notify]);
 
   const saveProfile = async () => {
     const res = await fetch("/api/users/me", {

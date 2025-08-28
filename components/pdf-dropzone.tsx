@@ -178,6 +178,11 @@ export function PdfDropzone({ onSelect, onUploadComplete, onUploadError, classNa
                   }),
                 });
 
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || "Text extraction failed");
+                }
+
                 const data = await response.json();
                 console.log("Free OCR response:", data);
 

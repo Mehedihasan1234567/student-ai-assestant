@@ -1,20 +1,20 @@
-import type { Metadata } from 'next'
-import { GeistSans } from 'geist/font/sans'
-import { GeistMono } from 'geist/font/mono'
-import './globals.css'
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
+import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.dev',
-}
+  title: "studymate - Your Personal AI Study Assistant",
+  description: "Create quizzes and summaries from your notes using AI.",
+  generator: "Next.js",
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="en">
@@ -39,5 +39,5 @@ html {
         </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }

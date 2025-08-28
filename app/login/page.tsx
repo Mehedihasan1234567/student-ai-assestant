@@ -32,8 +32,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-      <Card className="w-full max-w-md mx-4">
+    <div className="flex items-center justify-center min-h-screen bg-blue-100 dark:bg-gray-800">
+      <Card className="w-full max-w-md mx-4 bg-white dark:bg-gray-900">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Welcome</CardTitle>
           <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -65,7 +65,10 @@ export default function LoginPage() {
               />
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" className="w-full">
+            <Button
+              type="submit"
+              className="w-full bg-blue-500 text-white hover:bg-blue-600"
+            >
               Sign In
             </Button>
           </form>
